@@ -1,0 +1,539 @@
+{% extends "base.html" %}
+{% block title %}Chat - Groq Chatbot{% endblock %}
+{% block new_chat_active %}bg-[var(--border-color)]{% endblock %}
+
+{% block content %}
+<header class="chat-header p-6 border-b">
+    <div class="flex justify-between items-center">
+        <h2 class="text-2xl font-semibold text-[var(--text-primary)]">Chat with AI</h2>
+        <div class="flex items-center gap-4">
+            <div class="custom-select-wrapper">
+                <select id="llm-select" class="custom-select">
+                    {% for model_id, model_info in models.items() %}
+                    <option value="{{ model_id }}" data-supports-images="{{ model_info.supports_images }}">{{ model_info.name }}</option>
+                    {% endfor %}
+                </select>
+                <span class="material-symbols-outlined custom-select-arrow">expand_more</span>
+            </div>
+            <button class="flex items-center gap-2 px-4 py-2.5 rounded-lg bg-[var(--accent-color)] text-white text-sm font-medium hover:bg-opacity-80 transition-colors duration-200" id="new-chat">
+                <span class="material-symbols-outlined">add</span> New Chat
+            </button>
+            <div class="bg-center bg-no-repeat aspect-square bg-cover rounded-full size-10 shrink-0 border-2 border-[var(--accent-color)]" style='background-image: url("https://lh3.googleusercontent.com/aida-public/AB6AXuCnSzuK07E8uzFBMe9ONIV2y9CaIGRsQArq8qKi5InUoANRUEqt7sFgen4RHTD5YcT9WPZPJ_gCL5T9YKlkcrDNv6L7WbJUh2qbLdg8UgVonRlY7QJtPxa6RHrVPjq6vy_Z2o1KckHCLlenJPiirVpVgsj1VQakJs9kOz3RNedQpXQxX-VujQ2wLDS059OWyEIW9sf43joPWs8kh9Rdopj7MXaGJDStKC36zHG_L_XJ24UabS2gseOTEFAJ3CQGPD91TfAQUNE1Csg ");'></div>
+        </div>
+    </div>
+</header>
+
+<div class="flex-grow p-6 space-y-6 overflow-y-auto" id="chat-container">
+    <!-- Messages will be populated by JavaScript -->
+</div>
+
+<footer class="chat-footer p-6 border-t">
+    <form id="chat-form" class="input-area flex items-center gap-3 p-3 rounded-lg">
+        <div class="relative dropdown-container">
+            <button type="button" class="icon-button" id="attach-button">
+                <span class="material-symbols-outlined">attach_file</span>
+            </button>
+            <div class="dropdown-menu absolute left-0 bottom-full mb-2 hidden bg-[var(--bg-secondary)] shadow-lg rounded-lg w-48 z-10 overflow-hidden">
+                <button type="button" class="dropdown-item flex items-center gap-2 w-full px-4 py-3 text-left text-sm hover:bg-[var(--border-color)]" data-type="document">
+                    <span class="material-symbols-outlined text-base">description</span>
+                    Attach Documents
+                </button>
+                <button type="button" class="dropdown-item flex items-center gap-2 w-full px-4 py-3 text-left text-sm hover:bg-[var(--border-color)]" data-type="image">
+                    <span class="material-symbols-outlined text-base">image</span>
+                    Add Image
+                </button>
+            </div>
+        </div>
+        <input id="message-input" class="input-field flex-grow bg-transparent placeholder-[var(--text-secondary)] focus:outline-none text-sm" placeholder="Send a message..." type="text"/>
+        <button type="button" class="icon-button" id="mic-button">
+            <span class="material-symbols-outlined">mic</span>
+        </button>
+        <button type="submit" class="bg-[var(--accent-color)] text-white p-2 rounded-md hover:bg-opacity-80">
+            <span class="material-symbols-outlined">send</span>
+        </button>
+    </form>
+</footer>
+
+<!-- Hidden file inputs -->
+<input type="file" id="document-input" class="hidden" accept=".pdf,.doc,.docx,.txt,.rtf,.md">
+<input type="file" id="image-input" class="hidden" accept="image/*">
+
+<script>
+    // Chat functionality
+    const chatForm = document.getElementById('chat-form');
+    const messageInput = document.getElementById('message-input');
+    const chatContainer = document.getElementById('chat-container');
+    const llmSelect = document.getElementById('llm-select');
+    const newChatButton = document.getElementById('new-chat');
+    
+    let currentChatId = null;
+    let currentModel = llmSelect.value;
+    let activeImage = null;
+
+    // Initialize chat from URL parameter if present
+    const urlParams = new URLSearchParams(window.location.search);
+    const initialChatId = urlParams.get('chat_id') || "{{ initial_chat_id | default('') }}";
+    if (initialChatId) {
+        loadChat(initialChatId);
+    }
+    // Dropdown functionality for attach button
+    const attachButton = document.getElementById('attach-button');
+    const dropdownMenu = document.querySelector('.dropdown-menu');
+    const documentInput = document.getElementById('document-input');
+    const imageInput = document.getElementById('image-input');
+    
+    attachButton.addEventListener('click', (e) => {
+        e.stopPropagation();
+        dropdownMenu.classList.toggle('hidden');
+    });
+
+    // Close dropdown when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!attachButton.contains(e.target) && !dropdownMenu.contains(e.target)) {
+            dropdownMenu.classList.add('hidden');
+        }
+    });
+
+    // Close dropdown when pressing Escape key
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && !dropdownMenu.classList.contains('hidden')) {
+            dropdownMenu.classList.add('hidden');
+        }
+    });
+
+    // Handle dropdown item clicks
+    document.querySelectorAll('.dropdown-item').forEach(item => {
+        item.addEventListener('click', (e) => {
+            e.preventDefault();
+            const type = item.dataset.type;
+            
+            if (type === 'document') {
+                documentInput.click();
+            } else if (type === 'image') {
+                // Check if selected model supports images
+                const selectedOption = llmSelect.options[llmSelect.selectedIndex];
+                const supportsImages = selectedOption.dataset.supportsImages === 'True';
+                
+                if (supportsImages) {
+                    imageInput.click();
+                } else {
+                    showNotification('This model does not support image inputs', 'error');
+                }
+            }
+            
+            dropdownMenu.classList.add('hidden');
+        });
+    });
+
+    // File selection handlers
+    documentInput.addEventListener('change', function(e) {
+        handleFileUpload(e, 'document');
+    });
+
+    imageInput.addEventListener('change', function(e) {
+        handleFileUpload(e, 'image');
+    });
+
+    function handleFileUpload(e, type) {
+        const files = e.target.files;
+        if (!files || files.length === 0) return;
+
+        const file = files[0];
+        const fileName = file.name;
+        const fileSize = formatFileSize(file.size);
+
+        // For images, we'll store the image data
+        if (type === 'image') {
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const imageData = e.target.result;
+                activeImage = imageData;
+                
+                // Create preview element
+                createImagePreview(fileName, fileSize, imageData);
+                showNotification('Image added: ' + fileName);
+            };
+            reader.readAsDataURL(file);
+        } else {
+            // Create document preview
+            createDocumentPreview(fileName, fileSize);
+            showNotification('Document added: ' + fileName);
+        }
+
+        // Reset input
+        e.target.value = '';
+    }
+
+    function createImagePreview(fileName, fileSize, imageData) {
+        // Remove any existing image preview
+        const existingPreview = document.querySelector('.file-preview.image-preview');
+        if (existingPreview) existingPreview.remove();
+
+        // Create preview element
+        const preview = document.createElement('div');
+        preview.className = 'file-preview image-preview flex items-center gap-3 p-3 bg-[var(--bg-secondary)] rounded-lg mb-3';
+        preview.innerHTML = `
+            <div class="file-icon">
+                <span class="material-symbols-outlined text-green-500">image</span>
+            </div>
+            <div class="file-info flex-1">
+                <p class="text-sm font-medium truncate">${fileName}</p>
+                <p class="text-xs text-[var(--text-secondary)]">${fileSize}</p>
+            </div>
+            <div class="image-thumbnail w-12 h-12 rounded-md overflow-hidden border border-[var(--border-color)]">
+                <img src="${imageData}" alt="${fileName}" class="w-full h-full object-cover">
+            </div>
+            <button class="remove-file text-[var(--text-secondary)] hover:text-[var(--accent-color)]">
+                <span class="material-symbols-outlined text-base">close</span>
+            </button>
+        `;
+
+        // Add to chat container before messages
+        chatContainer.insertBefore(preview, chatContainer.firstChild);
+
+        // Add remove functionality
+        preview.querySelector('.remove-file').addEventListener('click', () => {
+            preview.remove();
+            activeImage = null;
+        });
+
+        // Scroll to show preview
+        chatContainer.scrollTop = 0;
+    }
+
+    function createDocumentPreview(fileName, fileSize) {
+        const preview = document.createElement('div');
+        preview.className = 'file-preview flex items-center gap-3 p-3 bg-[var(--bg-secondary)] rounded-lg mb-3';
+        preview.innerHTML = `
+            <div class="file-icon">
+                <span class="material-symbols-outlined text-blue-500">description</span>
+            </div>
+            <div class="file-info flex-1">
+                <p class="text-sm font-medium truncate">${fileName}</p>
+                <p class="text-xs text-[var(--text-secondary)]">${fileSize}</p>
+            </div>
+            <button class="remove-file text-[var(--text-secondary)] hover:text-[var(--accent-color)]">
+                <span class="material-symbols-outlined text-base">close</span>
+            </button>
+        `;
+
+        // Add to chat container before messages
+        chatContainer.insertBefore(preview, chatContainer.firstChild);
+
+        // Add remove functionality
+        preview.querySelector('.remove-file').addEventListener('click', () => {
+            preview.remove();
+        });
+
+        // Scroll to show preview
+        chatContainer.scrollTop = 0;
+    }
+
+    function formatFileSize(bytes) {
+        if (bytes === 0) return '0 Bytes';
+        const k = 1024;
+        const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+        const i = Math.floor(Math.log(bytes) / Math.log(k));
+        return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i];
+    }
+
+    function showNotification(message, type = 'success') {
+        // Remove existing notifications
+        document.querySelectorAll('.notification').forEach(n => n.remove());
+        
+        // Create notification element
+        const notification = document.createElement('div');
+        notification.className = 'notification fixed bottom-4 right-4 bg-[var(--bg-secondary)] text-[var(--text-primary)] px-4 py-3 rounded-lg shadow-lg flex items-center gap-2 border border-[var(--border-color)]';
+        
+        const icon = type === 'success' ? 
+            '<span class="material-symbols-outlined text-green-500">check_circle</span>' :
+            '<span class="material-symbols-outlined text-red-500">error</span>';
+        
+        notification.innerHTML = `
+            ${icon}
+            <span>${message}</span>
+        `;
+        
+        document.body.appendChild(notification);
+        
+        // Auto-remove after 3 seconds
+        setTimeout(() => {
+            notification.classList.add('fade-out');
+            setTimeout(() => notification.remove(), 300);
+        }, 3000);
+    }
+
+    function loadChatHistory() {
+        fetch('/api/chat/history')
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    updateChatHistoryUI(data.chat_history);
+                }
+            })
+            .catch(error => {
+                console.error('Error loading chat history:', error);
+            });
+    }
+
+    function updateChatHistoryUI(chatHistory) {
+        const chatHistoryContainer = document.querySelector('.chat-history');
+        if (!chatHistoryContainer) return;
+        
+        chatHistoryContainer.innerHTML = '';
+        
+        if (chatHistory.length === 0) {
+            chatHistoryContainer.innerHTML = '<div class="px-4 py-2 text-sm text-[var(--text-secondary)]">No chat history</div>';
+            return;
+        }
+        
+        chatHistory.forEach(chat => {
+            const chatElement = document.createElement('a');
+            chatElement.className = 'nav-link flex items-center justify-between gap-3 px-4 py-2.5 rounded-lg transition-colors duration-200 group load-chat-btn';
+            chatElement.href = '#';
+            chatElement.dataset.chatId = chat._id;
+            chatElement.innerHTML = `
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-base">chat_bubble</span>
+                    <span class="text-sm font-medium truncate" title="${chat.title}">${chat.title}</span>
+                </div>
+                <button class="text-[var(--text-secondary)] opacity-0 group-hover:opacity-100 hover:text-red-500 transition-opacity duration-200 delete-chat-btn" data-chat-id="${chat._id}">
+                    <span class="material-symbols-outlined text-base">delete</span>
+                </button>
+            `;
+            chatHistoryContainer.appendChild(chatElement);
+        });
+        
+        setupDeleteButtons();
+        setupChatLoadButtons();
+    }
+
+    // Setup chat load buttons
+    function setupChatLoadButtons() {
+        document.querySelectorAll('.load-chat-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const chatId = this.dataset.chatId;
+                loadChat(chatId);
+            });
+        });
+    }
+
+    // Setup delete buttons
+    function setupDeleteButtons() {
+        document.querySelectorAll('.delete-chat-btn').forEach(button => {
+            button.addEventListener('click', function(e) {
+                e.preventDefault();
+                const chatId = this.dataset.chatId;
+                
+                if (confirm('Are you sure you want to delete this chat?')) {
+                    fetch(`/api/chat/delete/${chatId}`, {
+                        method: 'DELETE'
+                    }).then(() => {
+                        if (currentChatId === chatId) {
+                            // If deleting current chat, start new one
+                            currentChatId = null;
+                            chatContainer.innerHTML = '';
+                        }
+                        loadChatHistory();
+                    });
+                }
+            });
+        });
+    }
+
+    // Load existing chat
+    function loadChat(chatId) {
+        fetch(`/api/chat/${chatId}`)
+            .then(response => response.json())
+            .then(data => {
+                if (data.success) {
+                    currentChatId = chatId;
+                    currentModel = data.chat.model;
+                    llmSelect.value = currentModel;
+                    chatContainer.innerHTML = '';
+                    
+                    // Reset active image
+                    activeImage = null;
+                    
+                    // Display messages
+                    data.chat.messages.forEach(message => {
+                        const messageElement = document.createElement('div');
+                        messageElement.className = message.role === 'user' ? 'flex justify-end' : 'flex justify-start';
+                        
+                        if (message.role === 'user' && message.image) {
+                            // Display image message
+                            messageElement.innerHTML = `
+                                <div class="message-user p-3 rounded-lg max-w-xl">
+                                    ${message.content ? `<p class="text-sm mb-2">${message.content}</p>` : ''}
+                                    <div class="image-message mt-2">
+                                        <img src="${message.image}" alt="Uploaded image" class="max-w-xs rounded-lg">
+                                    </div>
+                                </div>
+                            `;
+                        } else {
+                            // Regular text message
+                            messageElement.innerHTML = `
+                                <div class="${message.role === 'user' ? 'message-user' : 'message-ai'} p-3 rounded-lg max-w-xl">
+                                    <p class="text-sm">${message.content}</p>
+                                </div>
+                            `;
+                        }
+                        
+                        chatContainer.appendChild(messageElement);
+                    });
+                    
+                    chatContainer.scrollTop = chatContainer.scrollHeight;
+                    
+                    // Update URL without reloading
+                    const newUrl = new URL(window.location);
+                    newUrl.searchParams.set('chat_id', chatId);
+                    window.history.replaceState({}, '', newUrl);
+                }
+            });
+    }
+
+    // Send message with image to Groq (only for Llama model)
+    chatForm.addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const message = messageInput.value.trim();
+        
+        // Don't send if there's no message and no image
+        if (!message && !activeImage) return;
+
+        // Add user message
+        const userMessage = document.createElement('div');
+        userMessage.className = 'flex justify-end';
+        
+        if (activeImage) {
+            // Display image message
+            userMessage.innerHTML = `
+                <div class="message-user p-3 rounded-lg max-w-xl">
+                    ${message ? `<p class="text-sm mb-2">${message}</p>` : ''}
+                    <div class="image-message mt-2">
+                        <img src="${activeImage}" alt="Uploaded image" class="max-w-xs rounded-lg">
+                    </div>
+                </div>
+            `;
+        } else {
+            // Regular text message
+            userMessage.innerHTML = `
+                <div class="message-user p-3 rounded-lg max-w-xl">
+                    <p class="text-sm">${message}</p>
+                </div>
+            `;
+        }
+        
+        chatContainer.appendChild(userMessage);
+        messageInput.value = '';
+
+        // Show typing indicator
+        const typingIndicator = document.createElement('div');
+        typingIndicator.className = 'flex justify-start';
+        typingIndicator.innerHTML = `
+            <div class="message-ai p-3 rounded-lg max-w-xl">
+                <p class="text-sm text-[var(--text-secondary)]">Typing...</p>
+            </div>
+        `;
+        chatContainer.appendChild(typingIndicator);
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+
+        try {
+            // Prepare request data
+            const requestData = {
+                message: message,
+                model: currentModel,
+                chat_id: currentChatId
+            };
+
+            // Add image only for Llama model
+            const selectedOption = llmSelect.options[llmSelect.selectedIndex];
+            const supportsImages = selectedOption.dataset.supportsImages === 'True';
+            
+            if (activeImage && supportsImages) {
+                requestData.image = activeImage;
+            }
+
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                body: JSON.stringify(requestData)
+            });
+
+            const data = await response.json();
+            
+            if (data.success) {
+                // Update current chat ID if this is a new chat
+                if (!currentChatId) {
+                    currentChatId = data.chat_id;
+                    loadChatHistory();
+                }
+                
+                // Replace typing indicator with response
+                typingIndicator.remove();
+                const aiMessage = document.createElement('div');
+                aiMessage.className = 'flex justify-start';
+                
+                // Create a container for the formatted response
+                aiMessage.innerHTML = `
+                    <div class="message-ai p-3 rounded-lg max-w-xl w-full">
+                        <div class="formatted-response text-sm text-[var(--text-primary)]">
+                            ${data.response}
+                        </div>
+                    </div>
+                `;
+                
+                chatContainer.appendChild(aiMessage);
+                
+                // Clear active image after successful send
+                const imagePreview = document.querySelector('.file-preview.image-preview');
+                if (imagePreview) imagePreview.remove();
+                activeImage = null;
+                
+                // Refresh chat history
+                loadChatHistory();
+            } else {
+                typingIndicator.querySelector('p').textContent = 'Error: ' + data.error;
+                typingIndicator.querySelector('p').className = 'text-sm text-red-500';
+            }
+        } catch (error) {
+            typingIndicator.querySelector('p').textContent = 'Connection error';
+            typingIndicator.querySelector('p').className = 'text-sm text-red-500';
+        }
+
+        chatContainer.scrollTop = chatContainer.scrollHeight;
+    });
+
+    // New chat button
+    newChatButton.addEventListener('click', () => {
+        currentChatId = null;
+        chatContainer.innerHTML = '';
+        llmSelect.value = 'llama3-70b-8192';
+        currentModel = 'llama3-70b-8192';
+        activeImage = null;
+    });
+
+    // Model selection
+    llmSelect.addEventListener('change', () => {
+        currentModel = llmSelect.value;
+        
+        // If switching to a model that doesn't support images, clear active image
+        const selectedOption = llmSelect.options[llmSelect.selectedIndex];
+        const supportsImages = selectedOption.dataset.supportsImages === 'True';
+        
+        if (!supportsImages && activeImage) {
+            const imagePreview = document.querySelector('.file-preview.image-preview');
+            if (imagePreview) imagePreview.remove();
+            activeImage = null;
+            showNotification('Image removed: Current model does not support images', 'error');
+        }
+    });
+
+    // Initial load
+    loadChatHistory();
+    setupDeleteButtons();
+    setupChatLoadButtons();
+</script>
+{% endblock %}

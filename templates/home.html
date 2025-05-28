@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Home - AI Workspace{% endblock %}
+{% block home_active %}bg-[var(--border-color)]{% endblock %}
+
+{% block content %}
+<div class="space-y-8">
+    <div class="text-center">
+        <h1 class="text-3xl font-semibold mb-2 text-[var(--text-primary)]">Welcome to AI Workspace</h1>
+        <p class="text-lg text-[var(--text-secondary)]">What can I help you with today?</p>
+    </div>
+
+    <div>
+        <h3 class="text-xl font-semibold text-[var(--text-primary)] mb-4">Select Language Model</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for model_id, model_info in models.items() %}
+            <div class="llm-card p-6 rounded-lg cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg">
+                <div class="flex items-center justify-between mb-3">
+                    <h4 class="text-xl font-semibold text-[var(--text-primary)]">{{ model_info.name }}</h4>
+                    <span class="material-symbols-outlined text-[var(--accent-color)]">bolt</span>
+                </div>
+                <p class="text-sm text-[var(--text-secondary)] mb-4">{{ model_info.description }}</p>
+                <a href="/chat" class="w-full px-4 py-2.5 rounded-lg bg-[var(--text-secondary)] text-[var(--text-primary)] text-sm font-medium hover:bg-opacity-80 transition-colors duration-200 inline-block text-center">
+                    Select Model
+                </a>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    <div>
+        <h3 class="text-xl font-semibold text-[var(--text-primary)] mb-4">Explore Features</h3>
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+            {% for feature in ['Voice Assistant', 'Text-to-Image', 'Image Analysis', 'API Integration', 'Database Integration', 'Website Reading'] %}
+            <div class="feature-card p-6 rounded-lg cursor-pointer transition-all duration-200 ease-in-out hover:shadow-lg flex flex-col items-center text-center">
+                <span class="material-symbols-outlined text-4xl text-[var(--accent-color)]">pending</span>
+                <h4 class="text-lg font-semibold mb-2 text-[var(--text-primary)]">{{ feature }}</h4>
+                <p class="text-sm text-[var(--text-secondary)]">Feature coming soon</p>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endblock %}

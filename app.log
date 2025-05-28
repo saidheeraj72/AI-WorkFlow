@@ -1,0 +1,17 @@
+PDF upload error: 413 Request Entity Too Large: The data value transmitted exceeds the capacity limit.
+FAISS storage error: string indices must be integers, not 'str'
+Chat error: Embedding storage failed: string indices must be integers, not 'str'
+FAISS storage error: string indices must be integers, not 'str'
+Chat error: Embedding storage failed: string indices must be integers, not 'str'
+Chat error: '79ff9e3e-8cb7-4c05-a037-936d86e62408'
+Chat error: '79ff9e3e-8cb7-4c05-a037-936d86e62408'
+FAISS storage error: string indices must be integers, not 'str'
+Chat error: Embedding storage failed: string indices must be integers, not 'str'
+FAISS storage error: string indices must be integers, not 'str'
+Chat error: Embedding storage failed: string indices must be integers, not 'str'
+PDF upload error: 413 Request Entity Too Large: The data value transmitted exceeds the capacity limit.
+Image processing error: cannot identify image file <_io.BytesIO object at 0x154d78c70>
+Chat error: Image processing failed: cannot identify image file <_io.BytesIO object at 0x154d78c70>
+Image processing error: cannot identify image file <_io.BytesIO object at 0x1793a7ce0>
+Chat error: Image processing failed: cannot identify image file <_io.BytesIO object at 0x1793a7ce0>
+Chat error: 'text'
