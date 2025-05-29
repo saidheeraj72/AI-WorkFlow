@@ -9,31 +9,6 @@
         <p class="text-lg text-[var(--text-secondary)]">What can I help you with today?</p>
     </div>
 
-    <div>
-        <h3 class="text-xl font-semibold text-[var(--text-primary)] mb-4">Recent Chats</h3>
-        <div class="bg-[var(--bg-secondary)] rounded-lg p-4 border border-[var(--border-color)]">
-            {% if chat_history %}
-                <div class="space-y-2">
-                    {% for chat in chat_history %}
-                    <a href="/chat?chat_id={{ chat._id }}" class="flex items-center justify-between p-3 rounded-lg hover:bg-[var(--border-color)] transition-colors duration-200 border border-[var(--border-color)]">
-                        <div class="flex items-center gap-3">
-                            <span class="material-symbols-outlined text-[var(--accent-color)]">chat_bubble</span>
-                            <span class="text-sm font-medium">{{ chat.title }}</span>
-                        </div>
-                        <span class="text-xs text-[var(--text-secondary)]">
-                            {{ chat.updated_at.strftime('%b %d, %Y %I:%M %p') }}
-                        </span>
-                    </a>
-                    {% endfor %}
-                </div>
-            {% else %}
-                <div class="text-center py-4 text-[var(--text-secondary)]">
-                    <p>No recent chats</p>
-                    <a href="/chat" class="text-[var(--accent-color)] hover:underline mt-2 inline-block">Start a new chat</a>
-                </div>
-            {% endif %}
-        </div>
-    </div>
 
     <div>
         <h3 class="text-xl font-semibold text-[var(--text-primary)] mb-4">Select Language Model</h3>
