@@ -12,6 +12,7 @@
     --text-secondary-dark: #90adcb;
     --border-dark: #223649;
     --accent-dark: #0c7ff2;
+    --accent-color-rgb: 12, 127, 242;
   }
   
   .dark-mode {
@@ -21,6 +22,7 @@
     --text-secondary: var(--text-secondary-dark);
     --border-color: var(--border-dark);
     --accent-color: var(--accent-dark);
+    --accent-color-rgb: 12, 127, 242;
   }
   
   .light-mode {
@@ -30,6 +32,7 @@
     --text-secondary: var(--text-secondary-light);
     --border-color: var(--border-light);
     --accent-color: var(--accent-light);
+    --accent-color-rgb: 37, 99, 235;
   }
   
   .material-symbols-outlined {
@@ -276,4 +279,20 @@
   padding-left: 1rem;
   margin: 1rem 0;
   color: var(--text-secondary);
+}
+/* Add hover effects */
+.llm-card:hover, .feature-card:hover {
+  transform: translateY(-3px);
+  transition: transform 0.3s ease, box-shadow 0.3s ease, border-color 0.3s ease;
+}
+
+/* Add border transitions */
+.llm-card, .feature-card {
+  transition: all 0.3s ease;
+  box-shadow: 0 4px 6px rgba(0, 0, 0, 0.05);
+}
+
+/* Add glow effect on hover */
+.llm-card:hover, .feature-card:hover {
+  box-shadow: 0 10px 25px rgba(var(--accent-color-rgb), 0.15);
 }
